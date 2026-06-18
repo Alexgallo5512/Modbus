@@ -1,11 +1,13 @@
 from pymodbus.datastore import (
-    ModbusBaseDeviceContext,
+    ModbusDeviceContext,
     ModbusSequentialDataBlock,
     ModbusServerContext
 )
 from pymodbus.server import StartTcpServer,ServerStop
 import threading
 import time
+import subprocess
+import os
 
 
 
@@ -16,7 +18,7 @@ def lectura_archivo():
     global lista_archivo
     try:
         lista_archivo.clear()
-        with open("/home/icam-540/CONFISISTEMA.txt","r", encoding="utf-8") as archivo:
+        with open("/home/icam-540/CONFISISTEMA_EL.txt","r", encoding="utf-8") as archivo:
             for linea in archivo:
                 linea = linea.replace('\n','')
                 linea_p = validacion_caracteres_linea(linea)
@@ -32,14 +34,14 @@ def actualizar_linea_archivo(linea,valor):
     global lista_archivo
     try:
         lista_archivo.clear()
-        with open("/home/icam-540/CONFISISTEMA.txt","r", encoding="utf-8") as archivo:
+        with open("/home/icam-540/CONFISISTEMA_EL.txt","r", encoding="utf-8") as archivo:
             lineas = archivo.readlines()
 
         while len(lineas) <= linea:
             lineas.append("\n")
             
         lineas[linea] = valor + "\n"
-        with open("/home/icam-540/CONFISISTEMA.txt","w", encoding="utf-8") as archivo:
+        with open("/home/icam-540/CONFISISTEMA_EL.txt","w", encoding="utf-8") as archivo:
             archivo.writelines(lineas)
         print("Modificacion linea Archivo")
         asignacion_direccion_lectura_archivo()
@@ -81,7 +83,7 @@ def inicio_Server():
     
     try:
         print('Inicio Server')
-        StartTcpServer(context, address=("192.168.0.43", 1502))
+        StartTcpServer(context, address=("192.168.0.27", 1502))
     except:
         print('Server ya esta iniciado')
         pass
@@ -117,18 +119,45 @@ def asignacion_direccion_lectura_archivo():
         enviar_holding_registers(context,address_a,lista_archivo[i])
         time.sleep(0.1)
         i+=1
+        
+proceso_yolo = None
+
+def iniciar_yolo(script_path):
+    global proceso_yolo
+
+    if proceso_yolo is not None and proceso_yolo.poll() is None:
+        print("⚠️ El proceso ya está en ejecución")
+        return
+
+    env = os.environ.copy()
+    env["PYTHONPATH"] = "/opt/advantech/sdk"
+    env["LB_LIBRARY_PATH"] = "/opt/advantech/sdk:/opt/advantech/sdk/CamNavi2:/opt/advantech/sdk/bin:/usr/lib/aarch64-linux-gnu"
+    env["GST_PLUGIN_PATH"] = "/opt/advantech/sdk/gst"
+    env["DISPLAY"] = ":0"
+
+    try:
+        proceso_yolo = subprocess.Popen(
+            ["/usr/bin/python3", "-u", script_path],
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        print(f"✅ Script iniciado correctamente: {script_path} (PID: {proceso_yolo.pid})")
+    except Exception as e:
+        print(f"❌ Error al iniciar script: {e}")
+        proceso_yolo = None
 
 
 
-class MyDevice(ModbusBaseDeviceContext):
+class MyDevice(ModbusDeviceContext):
 
 
     
     def __init__(self):
 
-        self.coils = ModbusSequentialDataBlock(0, [0]*1200)
-        self.holding = ModbusSequentialDataBlock(0, [10]*1200)
-        self.input = ModbusSequentialDataBlock(0, [10]*1200)
+        self.coils = ModbusSequentialDataBlock(1, [0]*10)
+        self.holding = ModbusSequentialDataBlock(1, [10]*10)
+        self.input = ModbusSequentialDataBlock(1, [10]*10)
 
     def getValues(self, fc_as_hex, address, count=1):
 
@@ -196,5 +225,9 @@ thread_server.start()
 #thread_update.start()
 
 asignacion_direccion_lectura_archivo()
-while True:   
+
+thread_yolo = threading.Thread(target=iniciar_yolo, args=("/home/icam-540/Proyectos/ICAM_540_ELEC_SERVICIO/Video_contnuo_modbus_cl.py",), daemon=True)
+thread_yolo.start()
+
+while True:
     time.sleep(1)
