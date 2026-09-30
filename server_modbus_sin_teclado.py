@@ -158,6 +158,7 @@ class MyDevice(ModbusDeviceContext):
         self.coils = ModbusSequentialDataBlock(1, [0]*10)
         self.holding = ModbusSequentialDataBlock(1, [10]*10)
         self.input = ModbusSequentialDataBlock(1, [10]*10)
+        super().__init__(co=self.coils, hr=self.holding, ir=self.input)
 
     def getValues(self, fc_as_hex, address, count=1):
 
@@ -226,7 +227,7 @@ thread_server.start()
 
 asignacion_direccion_lectura_archivo()
 
-thread_yolo = threading.Thread(target=iniciar_yolo, args=("/home/icam-540/Proyectos/ICAM_540_ELEC_SERVICIO/Video_contnuo_modbus_cl.py",), daemon=True)
+thread_yolo = threading.Thread(target=iniciar_yolo, args=("/home/icam-540/PROYECTOS/ICAM_540_ELEC_SERVICIO/Video_contnuo_modbus_cl.py",), daemon=True)
 thread_yolo.start()
 
 while True:
